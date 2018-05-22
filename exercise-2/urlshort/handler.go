@@ -1,10 +1,12 @@
 package urlshort
 
 import (
+	"fmt"
 	"net/http"
 
 	"encoding/json"
 
+	bolt "github.com/coreos/bbolt"
 	"gopkg.in/yaml.v2"
 )
 
@@ -81,4 +83,31 @@ func JSONHandler(jsn []byte, fallback http.Handler) (http.HandlerFunc, error) {
 
 	m := createMap(j)
 	return MapHandler(m, fallback), nil
+}
+
+// DBHandler reads key/values as paths/urls from the DB
+func DBHandler(db *bolt.DB, fallback http.Handler) http.HandlerFunc {
+	var path []byte
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("mappings"))
+			v := b.Get([]byte(r.URL.Path))
+			path = make([]byte, len(v))
+
+			copy(path, v)
+
+			return nil
+		})
+
+		p := string(path)
+		if p == "" {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+
+		http.Redirect(w, r, p, 302)
+
+		fmt.Println("derp", string(path))
+	}
 }

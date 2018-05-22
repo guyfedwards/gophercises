@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
+	bolt "github.com/coreos/bbolt"
 	"github.com/guyfedwards/gophercises/exercise-2/urlshort"
 )
 
@@ -56,8 +58,16 @@ func main() {
 		panic(err)
 	}
 
+	db, err := bolt.Open("my.db", 0600, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	DBHandler := urlshort.DBHandler(db, jsonHandler)
+
 	fmt.Println("Starting the server on :8080")
-	http.ListenAndServe(":8080", jsonHandler)
+	http.ListenAndServe(":8080", DBHandler)
 }
 
 func defaultMux() *http.ServeMux {
