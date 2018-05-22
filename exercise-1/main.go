@@ -16,8 +16,7 @@ import (
 func main() {
 	filePtr := flag.String("file", "./problems.csv", "path to questions csv file")
 	timePtr := flag.Int("time", 30, "time limit for quix in ms")
-
-	timer := time.NewTimer(time.Duration(*timePtr) * time.Second)
+	flag.Parse()
 
 	f, err := ioutil.ReadFile(*filePtr)
 	if err != nil {
@@ -34,31 +33,38 @@ func main() {
 	var correct int
 
 	start := time.Now()
+	timer := time.NewTimer(time.Duration(*timePtr) * time.Second)
 
 	for _, q := range records {
 		fmt.Printf("%v=\n", q[0])
-		text, _ := reader.ReadString('\n')
-		a, err := strconv.Atoi(strings.Replace(text, "\n", "", -1))
+		answerCh := make(chan int)
+		go func() {
+			text, _ := reader.ReadString('\n')
+			a, err := strconv.Atoi(strings.Replace(text, "\n", "", -1))
 
-		if err != nil {
-			log.Fatal("Error: Invalid user input %s", err)
+			if err != nil {
+				log.Fatal("Error: Invalid user input %s", err)
+			}
+
+			answerCh <- a
+		}()
+		select {
+		case <-timer.C:
+			fmt.Printf("You ran out of time\n")
+			fmt.Printf("You got %v/%v correct\n", correct, len(records))
+			return
+		case a := <-answerCh:
+			b, _ := strconv.Atoi(q[1])
+
+			if a == b {
+				correct++
+			}
+
+			fmt.Println(a == b)
 		}
-		b, _ := strconv.Atoi(q[1])
-
-		if a == b {
-			correct++
-		}
-
-		<-timer.C
-		fmt.Print("expired")
-
-		fmt.Println(a == b)
 	}
-
-	timer.Stop()
 
 	t := time.Now()
 	fmt.Printf("You took %v\n", t.Sub(start))
 	fmt.Printf("You got %v/%v correct\n", correct, len(records))
-
 }
